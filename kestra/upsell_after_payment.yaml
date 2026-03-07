@@ -1,0 +1,27 @@
+id: upsell_after_payment
+namespace: agente_ia_ofm
+
+description: |
+  Schedules upsell offers after successful payment.
+  Triggered when payment is confirmed.
+
+tasks:
+  - id: schedule_upsell
+    type: io.kestra.plugin.core.http.Request
+    description: Schedule upsell follow-up
+    uri: http://api:8000/internal/followups/upsell
+    method: POST
+    body: |
+      {
+        "order_id": "{{ inputs.order_id }}",
+        "contact_id": "{{ inputs.contact_id }}"
+      }
+
+inputs:
+  - id: order_id
+    type: STRING
+    required: true
+
+  - id: contact_id
+    type: STRING
+    required: true

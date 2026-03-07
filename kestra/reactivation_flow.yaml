@@ -1,0 +1,37 @@
+id: reactivation_flow
+namespace: agente_ia_ofm
+
+description: |
+  Reactivates inactive contacts with a personalized message.
+  Runs daily to check for contacts inactive for 30+ days.
+
+tasks:
+  - id: get_inactive_contacts
+    type: io.kestra.plugin.core.http.Request
+    description: Get contacts inactive for 30+ days
+    uri: http://api:8000/internal/contacts/inactive
+    method: GET
+    formData:
+      days: "30"
+
+  - id: process_contacts
+    type: io.kestra.plugin.core.flow.Each
+    description: Process each inactive contact
+    value: "{{ get_inactive_contacts.body }}"
+
+    tasks:
+      - id: send_reactivation
+        type: io.kestra.plugin.core.http.Request
+        description: Send reactivation message
+        uri: http://api:8000/internal/followups/reactivation
+        method: POST
+        body: |
+          {
+            "contact_id": "{{ JSON.parse(parent.currentValue).id }}",
+            "phone": "{{ JSON.parse(parent.currentValue).phone }}"
+          }
+
+triggers:
+  - id: schedule
+    type: io.kestra.plugin.core.trigger.Schedule
+    cron: "0 9 * * *"  # Runs at 9 AM daily

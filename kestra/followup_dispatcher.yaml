@@ -1,0 +1,23 @@
+id: followup_dispatcher
+namespace: agente_ia_ofm
+
+description: |
+  Dispatches pending follow-up messages to contacts.
+  Runs every minute to check for due follow-ups.
+
+tasks:
+  - id: get_pending_followups
+    type: io.kestra.plugin.core.http.Request
+    description: Get pending follow-ups from the API
+    uri: http://api:8000/internal/followups/pending
+    method: GET
+
+  - id: log_results
+    type: io.kestra.plugin.core.log.Log
+    description: Log the number of follow-ups found
+    message: "{{ render(get_pending_followups.body) }}"
+
+triggers:
+  - id: schedule
+    type: io.kestra.plugin.core.trigger.Schedule
+    cron: "*/1 * * * *"

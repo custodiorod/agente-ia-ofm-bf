@@ -1,0 +1,102 @@
+version: '3.8'
+
+services:
+  # FastAPI Application
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agente-ia-api
+    restart: unless-stopped
+    environment:
+      - APP_ENV=${APP_ENV:-production}
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=redis://redis:6379/0
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OPENROUTER_MODEL=${OPENROUTER_MODEL:-anthropic/claude-3-haiku}
+      - UAZAPI_INSTANCE_ID=${UAZAPI_INSTANCE_ID}
+      - UAZAPI_API_TOKEN=${UAZAPI_API_TOKEN}
+      - PIXBANK_API_KEY=${PIXBANK_API_KEY}
+      - PIXBANK_SECRET_KEY=${PIXBANK_SECRET_KEY}
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
+      - SECRET_KEY=${SECRET_KEY}
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+    networks:
+      - agente-ia-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+  # Celery Worker
+  celery-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agente-ia-celery-worker
+    restart: unless-stopped
+    command: celery -A app.tasks.worker worker --loglevel=info --concurrency=4
+    environment:
+      - APP_ENV=${APP_ENV:-production}
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OPENROUTER_MODEL=${OPENROUTER_MODEL:-anthropic/claude-3-haiku}
+      - UAZAPI_INSTANCE_ID=${UAZAPI_INSTANCE_ID}
+      - UAZAPI_API_TOKEN=${UAZAPI_API_TOKEN}
+      - PIXBANK_API_KEY=${PIXBANK_API_KEY}
+      - PIXBANK_SECRET_KEY=${PIXBANK_SECRET_KEY}
+    depends_on:
+      - redis
+    networks:
+      - agente-ia-network
+
+  # Celery Beat (Scheduler)
+  celery-beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agente-ia-celery-beat
+    restart: unless-stopped
+    command: celery -A app.tasks.worker beat --loglevel=info
+    environment:
+      - APP_ENV=${APP_ENV:-production}
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - redis
+    networks:
+      - agente-ia-network
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    container_name: agente-ia-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    networks:
+      - agente-ia-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+networks:
+  agente-ia-network:
+    driver: bridge
+
+volumes:
+  redis-data:
+    driver: local

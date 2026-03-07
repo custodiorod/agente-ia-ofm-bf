@@ -1,0 +1,36 @@
+id: payment_reminder_flow
+namespace: agente_ia_ofm
+
+description: |
+  Sends payment reminders for orders awaiting payment.
+  Checks for payments pending for more than 20 minutes.
+
+tasks:
+  - id: get_pending_payments
+    type: io.kestra.plugin.core.http.Request
+    description: Get pending payments from the database
+    uri: http://api:8000/internal/payments/pending
+    method: GET
+
+  - id: filter_overdue
+    type: io.kestra.plugin.core.flow.Each
+    description: Process each overdue payment
+    value: "{{ get_pending_payments.body }}"
+
+    tasks:
+      - id: send_reminder
+        type: io.kestra.plugin.core.http.Request
+        description: Send payment reminder via WhatsApp
+        uri: http://api:8000/internal/followups/payment-reminder
+        method: POST
+        body: |
+          {
+            "order_id": "{{ JSON.parse(parent.currentValue).order_id }}",
+            "contact_id": "{{ JSON.parse(parent.currentValue).contact_id }}",
+            "amount": "{{ JSON.parse(parent.currentValue).amount }}"
+          }
+
+triggers:
+  - id: schedule
+    type: io.kestra.plugin.core.trigger.Schedule
+    cron: "*/20 * * * *"

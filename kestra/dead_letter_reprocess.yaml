@@ -1,0 +1,40 @@
+id: dead_letter_reprocess
+namespace: agente_ia_ofm
+
+description: |
+  Reprocesses failed messages and follow-ups.
+  Runs every hour to retry failed operations.
+
+tasks:
+  - id: get_failed_items
+    type: io.kestra.plugin.core.http.Request
+    description: Get failed follow-ups and messages
+    uri: http://api:8000/internal/system/failed
+    method: GET
+
+  - id: reprocess_failed
+    type: io.kestra.plugin.core.flow.Each
+    description: Reprocess each failed item
+    value: "{{ get_failed_items.body }}"
+
+    tasks:
+      - id: retry_item
+        type: io.kestra.plugin.core.http.Request
+        description: Retry the failed operation
+        uri: http://api:8000/internal/system/retry
+        method: POST
+        body: |
+          {
+            "item_id": "{{ JSON.parse(parent.currentValue).id }}",
+            "item_type": "{{ JSON.parse(parent.currentValue).type }}"
+          }
+
+  - id: log_results
+    type: io.kestra.plugin.core.log.Log
+    description: Log reprocessing results
+    message: "Reprocessed {{ reprocess_failed.items | length }} failed items"
+
+triggers:
+  - id: schedule
+    type: io.kestra.plugin.core.trigger.Schedule
+    cron: "0 * * * *"  # Runs every hour
