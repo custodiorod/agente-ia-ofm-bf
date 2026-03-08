@@ -8,6 +8,8 @@ services:
       dockerfile: Dockerfile
     container_name: agente-ia-api
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       - APP_ENV=${APP_ENV:-production}
       - DATABASE_URL=${DATABASE_URL}
@@ -22,7 +24,7 @@ services:
       - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
       - SECRET_KEY=${SECRET_KEY}
     ports:
-      - "8000:8000"
+      - "8001:8000"
     depends_on:
       - redis
     networks:
@@ -41,6 +43,8 @@ services:
       dockerfile: Dockerfile
     container_name: agente-ia-celery-worker
     restart: unless-stopped
+    env_file:
+      - .env
     command: celery -A app.tasks.worker worker --loglevel=info --concurrency=4
     environment:
       - APP_ENV=${APP_ENV:-production}
@@ -66,6 +70,8 @@ services:
       dockerfile: Dockerfile
     container_name: agente-ia-celery-beat
     restart: unless-stopped
+    env_file:
+      - .env
     command: celery -A app.tasks.worker beat --loglevel=info
     environment:
       - APP_ENV=${APP_ENV:-production}
